@@ -1,0 +1,305 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport"
+      content="width=device-width, initial-scale=1.0">
+
+<title>Storm Online AI</title>
+
+<style>
+* {
+    box-sizing: border-box;
+}
+
+body {
+    margin: 0;
+    height: 100vh;
+    background: #050b14;
+    color: white;
+    font-family: Arial, sans-serif;
+    display: flex;
+    flex-direction: column;
+}
+
+header {
+    background: #0b1726;
+    padding: 15px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    border-bottom: 1px solid #23445e;
+}
+
+.logo {
+    width: 45px;
+    height: 45px;
+    border-radius: 14px;
+    background: linear-gradient(135deg,#00aaff,#704cff);
+    display: grid;
+    place-items: center;
+    font-size: 25px;
+}
+
+.title {
+    font-size: 20px;
+    font-weight: bold;
+}
+
+.status {
+    font-size: 11px;
+    color: #65e895;
+}
+
+#chat {
+    flex: 1;
+    overflow-y: auto;
+    padding: 15px;
+    padding-bottom: 85px;
+}
+
+.message {
+    margin: 10px 0;
+    display: flex;
+}
+
+.user {
+    justify-content: flex-end;
+}
+
+.bubble {
+    max-width: 90%;
+    padding: 13px;
+    border-radius: 18px;
+    white-space: pre-wrap;
+    line-height: 1.5;
+}
+
+.bot .bubble {
+    background: #102338;
+    border-bottom-left-radius: 5px;
+}
+
+.user .bubble {
+    background: #087fc4;
+    border-bottom-right-radius: 5px;
+}
+
+#bar {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    padding: 10px;
+    background: #07111e;
+    border-top: 1px solid #23445e;
+    display: flex;
+    gap: 8px;
+}
+
+#input {
+    flex: 1;
+    min-width: 0;
+    padding: 13px;
+    border-radius: 25px;
+    border: 1px solid #315675;
+    background: #0c1e31;
+    color: white;
+    font-size: 16px;
+    outline: none;
+}
+
+#send {
+    border: none;
+    border-radius: 25px;
+    padding: 0 18px;
+    background: #078bdd;
+    color: white;
+    font-weight: bold;
+}
+</style>
+</head>
+
+<body>
+
+<header>
+    <div class="logo">⚡</div>
+
+    <div>
+        <div class="title">Storm Online</div>
+        <div class="status">● ONLINE AI</div>
+    </div>
+</header>
+
+<div id="chat"></div>
+
+<form id="bar">
+    <input
+        id="input"
+        placeholder="Message Storm..."
+        autocomplete="off"
+    >
+
+    <button id="send">
+        Send
+    </button>
+</form>
+
+<script>
+
+const chat = document.getElementById("chat");
+const input = document.getElementById("input");
+
+let history =
+    JSON.parse(
+        localStorage.getItem("storm_history") || "[]"
+    );
+
+function saveHistory() {
+
+    localStorage.setItem(
+        "storm_history",
+        JSON.stringify(history.slice(-50))
+    );
+}
+
+function addMessage(role, text) {
+
+    const message =
+        document.createElement("div");
+
+    message.className =
+        "message " +
+        (role === "user" ? "user" : "bot");
+
+    const bubble =
+        document.createElement("div");
+
+    bubble.className = "bubble";
+
+    bubble.textContent = text;
+
+    message.appendChild(bubble);
+
+    chat.appendChild(message);
+
+    chat.scrollTop = chat.scrollHeight;
+}
+
+function loadChat() {
+
+    if (history.length === 0) {
+
+        addMessage(
+            "assistant",
+            "Hey! I'm Storm ⚡\n\nI'm online and ready. Ask me anything."
+        );
+
+        return;
+    }
+
+    history.forEach(message => {
+
+        addMessage(
+            message.role,
+            message.content
+        );
+
+    });
+}
+
+async function sendMessage() {
+
+    const text = input.value.trim();
+
+    if (!text) return;
+
+    input.value = "";
+
+    addMessage("user", text);
+
+    history.push({
+        role: "user",
+        content: text
+    });
+
+    saveHistory();
+
+    addMessage(
+        "assistant",
+        "Storm is thinking..."
+    );
+
+    try {
+
+        const response =
+            await fetch("/api/chat", {
+
+                method: "POST",
+
+                headers: {
+                    "Content-Type":
+                        "application/json"
+                },
+
+                body: JSON.stringify({
+                    messages:
+                        history.slice(-30)
+                })
+
+            });
+
+        const data =
+            await response.json();
+
+        chat.lastElementChild.remove();
+
+        if (!response.ok) {
+            throw new Error(
+                data.error ||
+                "Storm could not respond."
+            );
+        }
+
+        addMessage(
+            "assistant",
+            data.text
+        );
+
+        history.push({
+            role: "assistant",
+            content: data.text
+        });
+
+        saveHistory();
+
+    } catch (error) {
+
+        chat.lastElementChild.remove();
+
+        addMessage(
+            "assistant",
+            "⚠️ " +
+            error.message
+        );
+    }
+}
+
+document
+    .getElementById("bar")
+    .addEventListener(
+        "submit",
+        function(event) {
+
+            event.preventDefault();
+
+            sendMessage();
+        }
+    );
+
+loadChat();
+
+</script>
+
+</body>
+</html>
